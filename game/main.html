@@ -1,0 +1,532 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Two Pros</title>
+<body>
+<script src="../pixi/pixi.min.js"></script>
+<script>
+
+//Aliases
+let Application = PIXI.Application,
+    Container = PIXI.Container,
+    loader = PIXI.loader,
+    resources = PIXI.loader.resources,
+    Graphics = PIXI.Graphics,
+    TextureCache = PIXI.utils.TextureCache,
+    Sprite = PIXI.Sprite,
+    Text = PIXI.Text,
+    TextStyle = PIXI.TextStyle;
+
+//Constants
+let SCREEN_WIDTH = 480,
+    SCREEN_HEIGHT = 640,
+    Rocket_WIDTH = 66,
+    Rocket_HEIGHT = 120,
+    Obstacle_WIDTH = 66,
+    Obstacle_HEIGHT = 66,
+    Lane = [30, 150, 270, 390];
+    fall_speed = [4, 5, 6, 8, 10, 12, 15, 20];
+    generate_time = [150, 120, 100, 80, 60, 50, 40, 30];
+
+//Create a Pixi Application
+let app = new Application({ 
+    width: SCREEN_WIDTH,
+    height: SCREEN_HEIGHT,                    
+    antialiasing: true, 
+    transparent: false, 
+    resolution: 1
+  }
+);
+
+//Add the canvas that Pixi automatically created for you to the HTML document
+document.body.appendChild(app.view);
+
+loader
+  .add([
+    "asset/rocket/red_rocket.png",
+    "asset/rocket/blue_rocket.png",
+    "asset/obstacle/AC.png",
+    "asset/obstacle/WA.png",
+    "asset/obstacle/RC.png",
+    "asset/rocket/life.png",
+    "asset/background/opening_rev2.png",
+    "asset/background/pause_rev.png",
+    "asset/background/gameover_rev2.png",
+    "asset/tutorial/1.FA.png",
+    "asset/tutorial/2.FA.png",
+    "asset/tutorial/3.FA.png",
+    "asset/tutorial/4.FA.png",
+    "asset/tutorial/5.FA.png",
+  ])
+  .load(setup);
+
+//Define variables that might be used in more 
+//than one function
+let state, explorer, treasure, blobs, chimes, exit, player, dungeon,
+    door, healthBar, message, gameScene, gameOverScene, enemies, id;
+
+let rocket1_final_pos = Lane[0],
+    rocket2_final_pos = Lane[2]
+
+function setup() {
+  //--------------------------------------------------
+  //                   StartUpMenu
+  //--------------------------------------------------
+  gameStartScene = new Container();
+  app.stage.addChild(gameStartScene);
+
+  gameOpeningMenu = new Sprite(resources["asset/background/opening_rev2.png"].texture);
+  gameOpeningMenu.position.set(0, 0)
+  gameStartScene.addChild(gameOpeningMenu);
+
+  //Set the game state
+  state = startup
+
+  //--------------------------------------------------
+  //                    Tutorial
+  //--------------------------------------------------
+  tutorialScene = new Container();
+  app.stage.addChild(tutorialScene);
+
+  tutorials = []
+  tutorialPage = 0
+  tutorials[0] = new Sprite(resources["asset/tutorial/1.FA.png"].texture);
+  tutorials[1] = new Sprite(resources["asset/tutorial/2.FA.png"].texture);
+  tutorials[2] = new Sprite(resources["asset/tutorial/3.FA.png"].texture);
+  tutorials[3] = new Sprite(resources["asset/tutorial/4.FA.png"].texture);
+  tutorials[4] = new Sprite(resources["asset/tutorial/5.FA.png"].texture);
+  for (let i=0; i<5; ++i) {
+    tutorials[i].position.set(0, 0)
+    tutorials[i].visible = false
+    tutorialScene.addChild(tutorials[i]);
+  }
+
+  //--------------------------------------------------
+  //                    Main Game
+  //--------------------------------------------------
+
+  //Make the game scene and add it to the stage
+  gameScene = new Container();
+  app.stage.addChild(gameScene);
+  gameScene.visible = false;
+
+  //Make the sprites and add them to the `gameScene`
+  //Rockets
+  rocket1 = new Sprite(resources["asset/rocket/red_rocket.png"].texture);
+  rocket1.x = Lane[0];
+  rocket1.y = 500;
+  rocket1.vx = 10;
+  gameScene.addChild(rocket1);
+  
+  rocket2 = new Sprite(resources["asset/rocket/blue_rocket.png"].texture);
+  rocket2.x = Lane[2];
+  rocket2.y = 500;
+  rocket2.vx = 10;
+  gameScene.addChild(rocket2);
+  
+  //Obstacles
+  Obs = []
+  for (let i=0; i<12; ++i) {
+    let Ob = new Sprite(resources["asset/obstacle/AC.png"].texture);
+    if (i>=4 && i<8) {
+      Ob = new Sprite(resources["asset/obstacle/WA.png"].texture);
+    }
+    else if (i>=8) {
+      Ob = new Sprite(resources["asset/obstacle/RC.png"].texture);
+    }
+    Ob.x = Lane[i%4];
+    Ob.y = 0;
+    Ob.vy = 0;
+    Ob.visible = false
+    Obs.push(Ob);
+    gameScene.addChild(Ob);
+  }
+
+  //Text
+  let style = new TextStyle({
+    fontFamily: "Helvetica",
+    fontSize: 36,
+    fill: "white"
+  });
+  scoreMsg = new Text('0', style);
+  scoreMsg.position.set(18, 18);
+  gameScene.addChild(scoreMsg);
+
+  lifeMsg = new Text('x 3', style);
+  lifeMsg.position.set(SCREEN_WIDTH - lifeMsg.width - 18, 18);
+  gameScene.addChild(lifeMsg);
+
+  //Life
+  lifeRocket = new Sprite(resources["asset/rocket/life.png"].texture);
+  lifeRocket.position.set(SCREEN_WIDTH - lifeMsg.width - 66, 18)
+  gameScene.addChild(lifeRocket);
+
+  //--------------------------------------------------
+  //                  GameOverMenu
+  //--------------------------------------------------
+
+  //Create the `gameOver` scene
+  gameOverScene = new Container();
+  app.stage.addChild(gameOverScene);
+
+  //Make the `gameOver` scene invisible when the game first starts
+  gameOverScene.visible = false;
+
+  gameOverMenu = new Sprite(resources["asset/background/gameover_rev2.png"].texture);
+  gameOverMenu.position.set(0, 0)
+  gameOverScene.addChild(gameOverMenu);
+
+  //Create the text sprite and add it to the `gameOver` scene
+  ACRate = new Text(`AC Rate: 0 %`, style);
+  ACRate.x = (SCREEN_WIDTH - ACRate.width)/2;
+  ACRate.y = SCREEN_HEIGHT/2 - ACRate.height*2
+  gameOverScene.addChild(ACRate);
+
+  printScore = new Text(`Your Score: 0`, style);
+  printScore.x = (SCREEN_WIDTH - printScore.width)/2
+  printScore.y = SCREEN_HEIGHT/2 - printScore.height
+  gameOverScene.addChild(printScore);
+
+  //--------------------------------------------------
+  //                Keyboard Handler
+  //--------------------------------------------------
+
+  //Capture the keyboard arrow keys
+  let Enter = keyboard(13),
+      keyF  = keyboard(70),
+      keyJ  = keyboard(74),
+      keyP  = keyboard(80);
+
+  Enter.press = function() {
+    if (state === tutorial) tutorialPage += 1
+    if (state === startup) {
+      if (tutorialPage === 0) state = tutorial
+      else state = play
+    }
+    else if (state === end) state = startup
+  };
+
+  keyF.press = function() {
+    //Change the rocket1's final_pos when the key is pressed
+    if (rocket1_final_pos === Lane[0]) rocket1_final_pos = Lane[1];
+    else rocket1_final_pos = Lane[0];
+  };
+
+  keyJ.press = function() {
+    //Change the rocket2's final_pos when the key is pressed
+    if (rocket2_final_pos === Lane[2]) rocket2_final_pos = Lane[3];
+    else rocket2_final_pos = Lane[2];
+  };
+
+  //Start the game loop 
+  app.ticker.add(delta => gameLoop(delta));
+}
+
+function gameLoop(delta){
+
+  //Update the current game state:
+  state(delta);
+}
+
+function tutorial() {
+  if (tutorialPage > 4) {
+    tutorials[4].visible = false
+    state = play
+  }
+  else {
+    if (tutorialPage === 0) gameStartScene.visible = false;
+    tutorials[tutorialPage].visible = true
+    if (tutorialPage !== 0) tutorials[tutorialPage-1].visible = false
+  }
+}
+
+function startup() {
+  gameOverScene.visible = false;
+  gameStartScene.visible = true;
+
+  //Reset Calculator
+  counter = 0
+  level = 0
+  score = 0
+  ACs = 0
+  WAs = 0
+  life = 3
+
+  //Reset Rockets
+  rocket1.x = Lane[0];
+  rocket2.x = Lane[2];
+  rocket1_final_pos = Lane[0],
+  rocket2_final_pos = Lane[2]
+
+  //Reset Obstacles
+  for (let i=0; i<12; ++i) {
+    Obs[i].y = 0;
+    Obs[i].vy = 0;
+    Obs[i].visible = false
+  }
+}
+
+function play(delta) {
+  gameStartScene.visible = false;
+  gameScene.visible = true;
+
+  //Switch the rocket's lane
+  if (rocket1.x < rocket1_final_pos) {
+    rocket1.x += rocket1.vx
+  }
+  else if (rocket1.x > rocket1_final_pos) {
+    rocket1.x -= rocket1.vx
+  }
+  if (rocket2.x < rocket2_final_pos) {
+    rocket2.x += rocket2.vx
+  }
+  else if (rocket2.x > rocket2_final_pos) {
+    rocket2.x -= rocket2.vx
+  }
+
+  //Generate obstacles
+  if (counter%generate_time[level] === 0) {
+    lane = randomInt(0, 150)
+    if(lane>=0    && lane<=36) {
+      Obs[0].visible = true;
+      Obs[0].vy = fall_speed[level];
+    }
+    if(lane>=37   && lane<=73) {
+      Obs[1].visible = true;
+      Obs[1].vy = fall_speed[level];
+    }
+    if(lane>=74   && lane<=110) {
+      Obs[4].visible = true;
+      Obs[4].vy = fall_speed[level];
+    }
+    if(lane>=111  && lane<=147) {
+      Obs[5].visible = true;
+      Obs[5].vy = fall_speed[level];
+    }
+    if(lane===148) {
+      Obs[8].visible = true;
+      Obs[8].vy = fall_speed[level];
+    }
+    if(lane===149) {
+      Obs[9].visible = true;
+      Obs[9].vy = fall_speed[level];
+    }
+  }
+
+  if (counter%generate_time[level] === generate_time[level]/2) {
+    lane = randomInt(0, 150)
+    if(lane>=0    && lane<=36) {
+      Obs[2].visible = true;
+      Obs[2].vy = fall_speed[level];
+    }
+    if(lane>=37   && lane<=73) {
+      Obs[3].visible = true;
+      Obs[3].vy = fall_speed[level];
+    }
+    if(lane>=74   && lane<=110) {
+      Obs[6].visible = true;
+      Obs[6].vy = fall_speed[level];
+    }
+    if(lane>=111  && lane<=147) {
+      Obs[7].visible = true;
+      Obs[7].vy = fall_speed[level];
+    }
+    if(lane===148) {
+      Obs[10].visible = true;
+      Obs[10].vy = fall_speed[level];
+    }
+    if(lane===149) {
+      Obs[11].visible = true;
+      Obs[11].vy = fall_speed[level];
+    }
+  }
+
+  //Loop through all the sprites in the `obstacles` array
+  for(let i=0; i<12; ++i) {
+
+    //Move the obstacles
+    Obs[i].y += Obs[i].vy
+
+    //If the obstacle reaches the bottom of the stage
+    if (Obs[i].y >= SCREEN_HEIGHT - Obstacle_HEIGHT) {
+      Obs[i].y = 0
+      Obs[i].vy = 0
+      Obs[i].visible = false
+      if (i<4) {
+        score -= 1
+        life -= 1
+      }
+        
+      if (score<0) score = 0
+      scoreMsg.text = score
+      lifeMsg.text = `x ${life}`
+    }
+
+    //If the obstacle hit the rocket
+    if (hitTestRectangle(rocket1, Obs[i])) {
+      Obs[i].y = 0
+      Obs[i].vy = 0
+      Obs[i].visible = false
+      
+      if (i<4) {              //AC
+        score += 1
+        ACs   += 1
+      }                
+      else if (i>=4 && i<8) { //WA
+        score -= 1
+        life  -= 1
+        WAs   += 1
+      }
+      else if (i>=8)          //RC
+        life += 1
+      
+      if (score<0) score = 0
+      scoreMsg.text = score
+      lifeMsg.text = `x ${life}`
+    }
+    if (hitTestRectangle(rocket2, Obs[i])) {
+      Obs[i].y = 0
+      Obs[i].vy = 0
+      Obs[i].visible = false
+
+      if (i<4) {              //AC
+        score += 1
+        ACs   += 1
+      }                
+      else if (i>=4 && i<8) { //WA
+        score -= 1
+        life  -= 1
+        WAs   += 1
+      }
+      else if (i>=8)          //RC
+        life += 1
+      
+      if (score<0) score = 0
+      scoreMsg.text = score
+      lifeMsg.text = `x ${life}`
+    }
+  }
+
+  //Increase difficulty
+  counter += 1
+  if (counter%600 === 0) {
+    if (level<7) level++
+    counter = 0
+  }
+  
+  //Does the rocket have enough health?
+  if (life <= 0) {
+    state = end;
+  }
+
+}
+
+function end() {
+  gameScene.visible = false;
+  gameOverScene.visible = true;
+
+  rate = ACs/(ACs+WAs)*100
+  ACRate.text = `AC Rate: ${rate.toFixed(2)} %`
+  ACRate.x = (SCREEN_WIDTH - ACRate.width)/2;
+  printScore.text = `Your Score: ${score}`
+  printScore.x = (SCREEN_WIDTH - printScore.width)/2;
+}
+
+/* Helper functions */
+
+//The `hitTestRectangle` function
+function hitTestRectangle(r1, r2) {
+
+  //Define the variables we'll need to calculate
+  let hit, combinedHalfWidths, combinedHalfHeights, vx, vy;
+
+  //hit will determine whether there's a collision
+  hit = false;
+
+  //Find the center points of each sprite
+  r1.centerX = r1.x + r1.width / 2; 
+  r1.centerY = r1.y + r1.height / 2; 
+  r2.centerX = r2.x + r2.width / 2; 
+  r2.centerY = r2.y + r2.height / 2; 
+
+  //Find the half-widths and half-heights of each sprite
+  r1.halfWidth = r1.width / 2;
+  r1.halfHeight = r1.height / 2;
+  r2.halfWidth = r2.width / 2;
+  r2.halfHeight = r2.height / 2;
+
+  //Calculate the distance vector between the sprites
+  vx = r1.centerX - r2.centerX;
+  vy = r1.centerY - r2.centerY;
+
+  //Figure out the combined half-widths and half-heights
+  combinedHalfWidths = r1.halfWidth + r2.halfWidth;
+  combinedHalfHeights = r1.halfHeight + r2.halfHeight;
+
+  //Check for a collision on the x axis
+  if (Math.abs(vx) < combinedHalfWidths) {
+
+    //A collision might be occurring. Check for a collision on the y axis
+    if (Math.abs(vy) < combinedHalfHeights) {
+
+      //There's definitely a collision happening
+      hit = true;
+    } else {
+
+      //There's no collision on the y axis
+      hit = false;
+    }
+  } else {
+
+    //There's no collision on the x axis
+    hit = false;
+  }
+
+  //`hit` will be either `true` or `false`
+  return hit;
+};
+
+//The `randomInt` helper function
+function randomInt(min, max) {
+  return Math.floor(Math.random() * (max - min + 1)) + min;
+}
+
+//The `keyboard` helper function
+function keyboard(keyCode) {
+  var key = {};
+  key.code = keyCode;
+  key.isDown = false;
+  key.isUp = true;
+  key.press = undefined;
+  key.release = undefined;
+  //The `downHandler`
+  key.downHandler = function(event) {
+    if (event.keyCode === key.code) {
+      if (key.isUp && key.press) key.press();
+      key.isDown = true;
+      key.isUp = false;
+    }
+    event.preventDefault();
+  };
+
+  //The `upHandler`
+  key.upHandler = function(event) {
+    if (event.keyCode === key.code) {
+      if (key.isDown && key.release) key.release();
+      key.isDown = false;
+      key.isUp = true;
+    }
+    event.preventDefault();
+  };
+
+  //Attach event listeners
+  window.addEventListener(
+    "keydown", key.downHandler.bind(key), false
+  );
+  window.addEventListener(
+    "keyup", key.upHandler.bind(key), false
+  );
+  return key;
+}
+
+</script>
+</body>
