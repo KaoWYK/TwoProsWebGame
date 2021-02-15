@@ -460,7 +460,7 @@ function end() {
   gameScene.visible = false;
   gameOverScene.visible = true;
 
-  rate = ACs/(ACs+WAs)*100
+  rate = (ACs === 0 && WAs === 0) ? 0 : ACs/(ACs+WAs)*100
   ACRate.text = `AC Rate: ${rate.toFixed(2)} %`
   ACRate.x = (SCREEN_WIDTH - ACRate.width)/2;
   printScore.text = `Your Score: ${score}`
