@@ -61,8 +61,11 @@ loader
 
 //Define variables that might be used in more 
 //than one function
-let state, explorer, treasure, blobs, chimes, exit, player, dungeon,
-    door, healthBar, message, gameScene, gameOverScene, enemies, id;
+let state, rocket1, rocket2,
+    counter, level, score, ACs, WAs, life,
+    scoreMsg, lifeMsg, lifeRocket,
+    gameStartScene, tutorialScene, gameScene, gameOverScene,
+    highscore = 0
 
 let rocket1_final_pos = Lane[0],
     rocket2_final_pos = Lane[2]
@@ -106,8 +109,19 @@ function setup() {
 
   //Make the game scene and add it to the stage
   gameScene = new Container();
+  app.renderer.backgroundColor = 0x323F5A
   app.stage.addChild(gameScene);
   gameScene.visible = false;
+
+  //Draw Lines
+  for (let i=1; i<=3; ++i) {
+    let line = new Graphics();
+    if (i===2) line.lineStyle(4, 0xF8F1E5, 1);
+    else line.lineStyle(2, 0xF8F1E5, 1);
+    line.moveTo(120*i-1, 80);
+    line.lineTo(120*i-1, 640);
+    gameScene.addChild(line);
+  }
 
   //Make the sprites and add them to the `gameScene`
   //Rockets
@@ -147,17 +161,20 @@ function setup() {
     fontSize: 36,
     fill: "white"
   });
-  scoreMsg = new Text('0', style);
-  scoreMsg.position.set(18, 18);
+
+  //Score
+  scoreMsg = new Text('', style);
   gameScene.addChild(scoreMsg);
 
-  lifeMsg = new Text('x 3', style);
-  lifeMsg.position.set(SCREEN_WIDTH - lifeMsg.width - 18, 18);
-  gameScene.addChild(lifeMsg);
+  //Level
+  levelMsg = new Text('', style);
+  gameScene.addChild(levelMsg);
 
   //Life
+  lifeMsg = new Text('', style);
+  gameScene.addChild(lifeMsg);
+  
   lifeRocket = new Sprite(resources["asset/rocket/life.png"].texture);
-  lifeRocket.position.set(SCREEN_WIDTH - lifeMsg.width - 66, 18)
   gameScene.addChild(lifeRocket);
 
   //--------------------------------------------------
@@ -185,6 +202,11 @@ function setup() {
   printScore.x = (SCREEN_WIDTH - printScore.width)/2
   printScore.y = SCREEN_HEIGHT/2 - printScore.height
   gameOverScene.addChild(printScore);
+
+  highScore = new Text(`High Score: 0`, style);
+  highScore.x = (SCREEN_WIDTH - printScore.width)/2
+  highScore.y = SCREEN_HEIGHT/2
+  gameOverScene.addChild(highScore);
 
   //--------------------------------------------------
   //                Keyboard Handler
@@ -250,6 +272,15 @@ function startup() {
   ACs = 0
   WAs = 0
   life = 3
+
+  scoreMsg.text = '0'
+  levelMsg.text = `LEVEL ${level+1}`
+  lifeMsg.text = `x ${life}`
+
+  scoreMsg.position.set(20, 18);
+  levelMsg.position.set((SCREEN_WIDTH - levelMsg.width)/2 - 9, 18);
+  lifeMsg.position.set(SCREEN_WIDTH - lifeMsg.width - 18, 18);
+  lifeRocket.position.set(SCREEN_WIDTH - lifeMsg.width - 60, 18)
 
   //Reset Rockets
   rocket1.x = Lane[0];
@@ -409,10 +440,15 @@ function play(delta) {
   //Increase difficulty
   counter += 1
   if (counter%600 === 0) {
-    if (level<7) level++
+    if (level<7) {
+      level++
+      if (level === 7) levelMsg.text = `LEVEL MAX`
+      else levelMsg.text = `LEVEL ${level+1}`
+      levelMsg.position.set((SCREEN_WIDTH - levelMsg.width)/2 - 9, 18);
+    }
     counter = 0
   }
-  
+
   //Does the rocket have enough health?
   if (life <= 0) {
     state = end;
@@ -429,6 +465,9 @@ function end() {
   ACRate.x = (SCREEN_WIDTH - ACRate.width)/2;
   printScore.text = `Your Score: ${score}`
   printScore.x = (SCREEN_WIDTH - printScore.width)/2;
+  highscore = (score > highscore) ? score : highscore
+  highScore.text = `High Score: ${highscore}`
+  highScore.x = (SCREEN_WIDTH - highScore.width)/2;
 }
 
 /* Helper functions */
