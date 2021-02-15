@@ -1,8 +1,12 @@
 <!doctype html>
 <meta charset="utf-8">
 <title>Two Pros</title>
+<head>
+  <script src="../pixi/pixi.min.js"></script>
+  <!-- <script src="sound.js"></script> -->
+</head>
+
 <body>
-<script src="../pixi/pixi.min.js"></script>
 <script>
 
 //Aliases
@@ -58,6 +62,14 @@ loader
     "asset/tutorial/5.FA.png",
   ])
   .load(setup);
+
+//Load the sounds
+// sounds.load([
+//   "asset/sound_effect/BGM.wav", 
+//   "asset/sound_effect/AC_rev.wav",
+//   "asset/sound_effect/WA.wav",
+//   "asset/sound_effect/RC.wav"
+// ]);
 
 //Define variables that might be used in more 
 //than one function
