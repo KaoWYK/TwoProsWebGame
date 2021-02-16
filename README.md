@@ -17,5 +17,8 @@ https://kaowyk.github.io/TwoProsWebGame/
 * Catch and collect "RC"(Red Cloud) to recover 1 life.
 
 ## Introduction
-大一計程期末小遊戲，寫到網頁上
-陽春版 2021.02.16
+大一計程期末小遊戲，寫到網頁上，使用 PixiJS
+陽春版：基礎功能 2021.02.16
+
+## Member
+高偉堯、李宇烜、周承宏
